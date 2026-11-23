@@ -9,7 +9,6 @@ from pptgen import PRESETS, ContentError, TemplateError, describe_template, make
 APP_NAME = "Slate.ai"
 MAX_SLIDES = 15
 CUSTOM = "Custom"
-TEMPLATE = "Your template"
 
 load_dotenv()  # local: read keys from .env
 # Streamlit Cloud: keys live in the app's "Secrets" settings
@@ -41,7 +40,7 @@ with st.container(border=True):
 
     preset = st.segmented_control(
         "Style",
-        [p.capitalize() for p in PRESETS] + [CUSTOM, TEMPLATE],
+        [p.capitalize() for p in PRESETS] + [CUSTOM],
         default="Minimal",
         required=True,
         key="style",
@@ -54,22 +53,22 @@ with st.container(border=True):
             placeholder="e.g. dark navy with gold accents, elegant serif fonts",
             key="custom_style",
         )
-    elif preset == TEMPLATE:
-        upload = st.file_uploader(
-            "Upload a PowerPoint template or deck",
-            type=["pptx", "potx"],
-            key="template",
-            help="Its layouts, backgrounds, logos, fonts and colours are used for every slide. "
-                 "Any existing slides in the file are replaced.",
-        )
-        if upload is not None:
-            template_bytes = upload.getvalue()
-            try:
-                st.caption(f":material/check_circle: {upload.name}  ·  "
-                           f"{describe_template(template_bytes)}")
-            except TemplateError as e:
-                st.error(str(e), icon=":material/error:")
-                template_bytes = None
+
+    upload = st.file_uploader(
+        "Or use your own PowerPoint template (optional)",
+        type=["pptx", "potx"],
+        key="template",
+        help="Its layouts, backgrounds, logos, fonts and colours are used for every slide. "
+             "Any existing slides in the file are replaced.",
+    )
+    if upload is not None:
+        template_bytes = upload.getvalue()
+        try:
+            st.caption(f":material/check_circle: Using {upload.name} "
+                       f"({describe_template(template_bytes)}). The style above is ignored.")
+        except TemplateError as e:
+            st.error(str(e), icon=":material/error:")
+            template_bytes = None
 
     left, right = st.columns(2, vertical_alignment="bottom")
     with left:
@@ -90,10 +89,10 @@ with st.container(border=True):
 
 # ---------------------------------------------------------------- generation
 if generate:
-    if preset == CUSTOM:
-        theme = custom_theme.strip()
-    elif preset == TEMPLATE:
+    if template_bytes is not None:
         theme = "match the uploaded template"
+    elif preset == CUSTOM:
+        theme = custom_theme.strip()
     else:
         theme = (preset or "minimal").lower()
     if len(topic.strip()) < 5:
@@ -101,8 +100,8 @@ if generate:
     elif not theme:
         st.error("Describe your custom style, or pick one of the presets.",
                  icon=":material/palette:")
-    elif preset == TEMPLATE and template_bytes is None:
-        st.error("Upload a .pptx or .potx template first, or pick another style.",
+    elif upload is not None and template_bytes is None:
+        st.error("That template can't be used. Remove it or upload another file.",
                  icon=":material/upload_file:")
     else:
         with st.status("Creating your deck...", expanded=True) as status:
