@@ -1,4 +1,4 @@
-"""Slate - the website. Run locally with:  streamlit run app.py"""
+"""Slate.ai - the website. Run locally with:  streamlit run app.py"""
 import os
 
 import streamlit as st
@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from pptgen import PRESETS, ContentError, make_presentation
 
-APP_NAME = "Slate"
+APP_NAME = "Slate.ai"
 MAX_SLIDES = 15
 CUSTOM = "Custom"
 
