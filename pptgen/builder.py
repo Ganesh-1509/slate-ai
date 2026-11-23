@@ -164,7 +164,7 @@ def shrink_to_fit(texts: List[str], build_items, width, height, min_pt: int, fon
 
 
 class DeckBuilder:
-    def __init__(self, theme: ThemeSpec):
+    def __init__(self, theme: ThemeSpec, prs=None):
         t = self.t = theme
         self.bg = "#" + _hex(t.background, "#FFFFFF")
         # Guard against AI themes with poor contrast
@@ -178,9 +178,16 @@ class DeckBuilder:
         self.palette = [self.accent, self.accent2, "#F59E0B", "#10B981", "#EF4444", "#6366F1"]
         self.deck_title = ""
 
-        self.prs = Presentation()
-        self.prs.slide_width, self.prs.slide_height = W, H
-        self.blank = self.prs.slide_layouts[6]
+        if prs is None:
+            prs = Presentation()
+            prs.slide_width, prs.slide_height = W, H
+        self.prs = prs
+        self.W, self.H = prs.slide_width, prs.slide_height
+        scale = self.W / W                       # 1.0 for 16:9 widescreen
+        self.margin = int(MARGIN * min(1.0, max(0.7, scale)))
+        self.content_bottom = self.H - Inches(0.75)
+        self.photo_full_bleed = True             # photos run to the slide edge
+        self.blank = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[-1]
 
     # ============================================================ primitives
     def _new_slide(self):
@@ -251,24 +258,26 @@ class DeckBuilder:
         """Title + accent bar + optional subtitle. Returns the y where content starts."""
         font = self.t.title_font
         size = fit_size([(spec.title, 1.0)], width, Inches(1.0), 34, 24, font)
-        self._text(slide, spec.title, MARGIN, Inches(0.4), width, Inches(1.0), size,
+        self._text(slide, spec.title, self.margin, Inches(0.4), width, Inches(1.0), size,
                    self.title_c, font, bold=True, anchor=MSO_ANCHOR.BOTTOM)
-        self._rect(slide, MARGIN + Inches(0.08), Inches(1.45), Inches(1.0), Inches(0.06), self.accent)
+        self._rect(slide, self.margin + Inches(0.08), Inches(1.45), Inches(1.0), Inches(0.06), self.accent)
         y = Inches(1.65)
         if spec.subtitle:
             sub = fit_size([(spec.subtitle, 1.0)], width, Inches(0.6), 18, 14, self.t.body_font)
-            self._text(slide, spec.subtitle, MARGIN, y, width, Inches(0.6), sub,
+            self._text(slide, spec.subtitle, self.margin, y, width, Inches(0.6), sub,
                        self.muted, italic=True)
             y += Inches(0.65)
         return y + Inches(0.15)
 
     def _footer(self, slide, number: int, light=False):
         color = self.muted if not light else on_color(self.accent)
-        self._text(slide, f"{number:02d}   |   {shorten(self.deck_title, 70)}", MARGIN, H - Inches(0.55),
+        self._text(slide, f"{number:02d}   |   {shorten(self.deck_title, 70)}", self.margin, self.H - Inches(0.55),
                    Inches(7), Inches(0.35), 10, color)
 
-    def _callout(self, slide, text, x, w, bottom=CONTENT_BOTTOM) -> int:
+    def _callout(self, slide, text, x, w, bottom=None) -> int:
         """Accent-tinted insight box sitting on `bottom`. Returns its top y."""
+        if bottom is None:
+            bottom = self.content_bottom
         size = 15
         label = "Key insight:  "
         text = shorten(text, 220)
@@ -341,63 +350,64 @@ class DeckBuilder:
         s = self._new_slide()
         photo = fetch_image(deck.cover_image_query)
         if photo:
-            self._picture_fill(s, photo[0], W * 0.55, 0, W * 0.45, H)
-            self._rect(s, W * 0.55 - Inches(0.12), 0, Inches(0.12), H, self.accent)
-            text_w = W * 0.55 - MARGIN - Inches(0.5)
+            self._picture_fill(s, photo[0], self.W * 0.55, 0, self.W * 0.45, self.H)
+            self._rect(s, self.W * 0.55 - Inches(0.12), 0, Inches(0.12), self.H, self.accent)
+            text_w = self.W * 0.55 - self.margin - Inches(0.5)
             self._notes(s, None, photo[1])
         else:  # decorative circles instead of a photo
-            d = H * 1.25
-            circle = s.shapes.add_shape(MSO_SHAPE.OVAL, int(W * 0.62), int(-H * 0.12), int(d), int(d))
+            d = self.H * 1.25
+            circle = s.shapes.add_shape(MSO_SHAPE.OVAL, int(self.W * 0.62), int(-self.H * 0.12), int(d), int(d))
             circle.fill.solid()
             circle.fill.fore_color.rgb = rgb(mix(self.bg, self.accent, 0.14))
             circle.line.fill.background()
-            small = s.shapes.add_shape(MSO_SHAPE.OVAL, int(W * 0.56), int(H * 0.62), int(H * 0.3), int(H * 0.3))
+            small = s.shapes.add_shape(MSO_SHAPE.OVAL, int(self.W * 0.56), int(self.H * 0.62), int(self.H * 0.3), int(self.H * 0.3))
             small.fill.solid()
             small.fill.fore_color.rgb = rgb(mix(self.bg, self.accent2, 0.3))
             small.line.fill.background()
-            text_w = W * 0.58 - MARGIN
+            text_w = self.W * 0.58 - self.margin
         font = self.t.title_font
         size = fit_size([(deck.title, 1.0)], text_w, Inches(2.2), 48, 30, font)
-        self._rect(s, MARGIN, Inches(2.1), Inches(1.5), Inches(0.1), self.accent)
-        self._text(s, deck.title, MARGIN, Inches(2.35), text_w, Inches(2.2), size,
+        self._rect(s, self.margin, Inches(2.1), Inches(1.5), Inches(0.1), self.accent)
+        self._text(s, deck.title, self.margin, Inches(2.35), text_w, Inches(2.2), size,
                    self.title_c, font, bold=True, anchor=MSO_ANCHOR.BOTTOM)
         sub = fit_size([(deck.subtitle, 1.0)], text_w, Inches(1.3), 22, 15, self.t.body_font)
-        self._text(s, deck.subtitle, MARGIN, Inches(4.7), text_w, Inches(1.3), sub, self.muted)
+        self._text(s, deck.subtitle, self.margin, Inches(4.7), text_w, Inches(1.3), sub, self.muted)
 
     def section(self, spec: SlideSpec, number: int, section_no: int):
         s = self._new_slide()
         photo = fetch_image(spec.image_query)
-        self._rect(s, 0, 0, Inches(0.25), H, self.accent)
-        text_w = (W * 0.52 if photo else W - 2 * MARGIN) - MARGIN
+        self._rect(s, 0, 0, Inches(0.25), self.H, self.accent)
+        text_w = (self.W * 0.52 if photo else self.W - 2 * self.margin) - self.margin
         if photo:
-            self._picture_fill(s, photo[0], W * 0.55, 0, W * 0.45, H)
-        self._text(s, f"{section_no:02d}", MARGIN, Inches(1.6), text_w, Inches(1.4), 80,
+            self._picture_fill(s, photo[0], self.W * 0.55, 0, self.W * 0.45, self.H)
+        self._text(s, f"{section_no:02d}", self.margin, Inches(1.6), text_w, Inches(1.4), 80,
                    mix(self.bg, self.accent, 0.55), self.t.title_font, bold=True)
         size = fit_size([(spec.title, 1.0)], text_w, Inches(1.5), 44, 28, self.t.title_font)
-        self._text(s, spec.title, MARGIN, Inches(3.0), text_w, Inches(1.5), size,
+        self._text(s, spec.title, self.margin, Inches(3.0), text_w, Inches(1.5), size,
                    self.title_c, self.t.title_font, bold=True)
         if spec.subtitle:
-            self._text(s, spec.subtitle, MARGIN, Inches(4.6), text_w, Inches(1.2), 18, self.muted)
+            self._text(s, spec.subtitle, self.margin, Inches(4.6), text_w, Inches(1.2), 18, self.muted)
         self._footer(s, number)
         self._notes(s, spec.speaker_notes, photo[1] if photo else None)
 
     def bullets(self, spec: SlideSpec, number: int):
         s = self._new_slide()
         photo = fetch_image(spec.image_query) if self._fits_beside_photo(spec) else None
-        if photo:
-            img_x = W * PHOTO_X
-            self._picture_fill(s, photo[0], img_x, 0, W - img_x, H)
-            right = img_x - Inches(0.45)
-        else:
-            right = W - MARGIN
-        width = right - MARGIN
+        img_x = self.W * PHOTO_X
+        if photo and self.photo_full_bleed:
+            self._picture_fill(s, photo[0], img_x, 0, self.W - img_x, self.H)
+        right = img_x - Inches(0.45) if photo else self.W - self.margin
+        width = right - self.margin
         top = self._header(s, spec, width)
-        bottom = self._callout(s, spec.callout, MARGIN, width) if spec.callout else CONTENT_BOTTOM
+        if photo and not self.photo_full_bleed:  # template mode: keep inside content area
+            self._picture_fill(s, photo[0], img_x, top, self.W - self.margin - img_x,
+                               self.content_bottom - top)
+        bottom = self._callout(s, spec.callout, self.margin, width) if spec.callout else self.content_bottom
         pts = spec.points[:6]
         if photo or len(pts) <= 3:
-            self._point_list(s, pts, MARGIN, top, width, bottom - top)
+            self._point_list(s, pts, self.margin, top, width, bottom - top)
         else:  # two numbered columns use the full width without long lines
-            self._point_columns(s, pts, MARGIN, top, width, bottom - top, numbered=True)
+            self._point_columns(s, pts, self.margin, top, width, bottom - top, numbered=True)
         self._footer(s, number)
         self._notes(s, spec.speaker_notes, photo[1] if photo else None)
 
@@ -405,23 +415,23 @@ class DeckBuilder:
         """Content beats decoration: only show a photo if the text stays readable next to it."""
         if not spec.image_query:
             return False
-        width = W * PHOTO_X - Inches(0.45) - MARGIN
-        height = CONTENT_BOTTOM - Inches(2.6) - (Inches(1.1) if spec.callout else 0)
+        width = self.W * PHOTO_X - Inches(0.45) - self.margin
+        height = self.content_bottom - Inches(2.6) - (Inches(1.1) if spec.callout else 0)
         items = [(f"00  {p.heading}: {p.detail}", 1.0) for p in spec.points[:6]]
         return fits(items, width, height, min_readable, self.t.body_font)
 
     def cards(self, spec: SlideSpec, number: int):
         s = self._new_slide()
-        top = self._header(s, spec, W - 2 * MARGIN)
-        bottom = self._callout(s, spec.callout, MARGIN, W - 2 * MARGIN) if spec.callout else CONTENT_BOTTOM
+        top = self._header(s, spec, self.W - 2 * self.margin)
+        bottom = self._callout(s, spec.callout, self.margin, self.W - 2 * self.margin) if spec.callout else self.content_bottom
         pts = spec.points[:6]
         cols = {1: 1, 2: 2, 3: 3, 4: 2}.get(len(pts), 3)   # 4 cards -> 2x2 grid
         rows = math.ceil(len(pts) / cols)
-        cw = (W - 2 * MARGIN - GAP * (cols - 1)) / cols
+        cw = (self.W - 2 * self.margin - GAP * (cols - 1)) / cols
         ch = (bottom - top - GAP * (rows - 1)) / rows
         pad = Inches(0.25)
         for i, pt in enumerate(pts):
-            x = MARGIN + (i % cols) * (cw + GAP)
+            x = self.margin + (i % cols) * (cw + GAP)
             y = top + (i // cols) * (ch + GAP)
             self._rect(s, x, y, cw, ch, self.surface, rounded=True, radius=0.05)
             self._rect(s, x, y, cw, Inches(0.07), self.accent if i % 2 == 0 else self.accent2)
@@ -461,14 +471,14 @@ class DeckBuilder:
 
     def two_column(self, spec: SlideSpec, number: int):
         s = self._new_slide()
-        top = self._header(s, spec, W - 2 * MARGIN)
-        bottom = self._callout(s, spec.callout, MARGIN, W - 2 * MARGIN) if spec.callout else CONTENT_BOTTOM
-        col_w = (W - 2 * MARGIN - Inches(0.4)) / 2
+        top = self._header(s, spec, self.W - 2 * self.margin)
+        bottom = self._callout(s, spec.callout, self.margin, self.W - 2 * self.margin) if spec.callout else self.content_bottom
+        col_w = (self.W - 2 * self.margin - Inches(0.4)) / 2
         head_h = Inches(0.65)
         hsize = min(fit_size([(c.heading, 1.05)], col_w - Inches(0.5), head_h, 20, 13,
                              self.t.title_font, line=1.1) for c in (spec.left, spec.right))
         for i, (col, color) in enumerate(((spec.left, self.accent), (spec.right, self.accent2))):
-            x = MARGIN + i * (col_w + Inches(0.4))
+            x = self.margin + i * (col_w + Inches(0.4))
             self._rect(s, x, top, col_w, head_h, color)
             self._text(s, shorten(col.heading, 60), x + Inches(0.25), top, col_w - Inches(0.5),
                        head_h, hsize, on_color(color), self.t.title_font, bold=True,
@@ -481,14 +491,14 @@ class DeckBuilder:
 
     def stats(self, spec: SlideSpec, number: int):
         s = self._new_slide()
-        top = self._header(s, spec, W - 2 * MARGIN)
-        source_y = CONTENT_BOTTOM - Inches(0.3)
+        top = self._header(s, spec, self.W - 2 * self.margin)
+        source_y = self.content_bottom - Inches(0.3)
         bottom = source_y - Inches(0.1)
         if spec.callout:
-            bottom = self._callout(s, spec.callout, MARGIN, W - 2 * MARGIN, bottom)
+            bottom = self._callout(s, spec.callout, self.margin, self.W - 2 * self.margin, bottom)
         tiles = spec.stats[:4]
         n = len(tiles)
-        tw = (W - 2 * MARGIN - GAP * (n - 1)) / n
+        tw = (self.W - 2 * self.margin - GAP * (n - 1)) / n
         if spec.points:
             th = max(Inches(2.2), min(Inches(2.8), (bottom - top) * 0.5))
             ty = top
@@ -498,7 +508,7 @@ class DeckBuilder:
         inner = max(Inches(0.15), (th - Inches(2.5)) / 2)   # centre value+label inside tile
         label_h = th - inner - Inches(1.15)
         for i, st in enumerate(tiles):
-            x = MARGIN + i * (tw + GAP)
+            x = self.margin + i * (tw + GAP)
             self._rect(s, x, ty, tw, th, self.surface, rounded=True, radius=0.06)
             self._rect(s, x, ty, Inches(0.08), th, self.palette[i % 2])
             vsize = fit_size([(st.value, 1.0)], tw - Inches(0.4), Inches(1.0), 60, 26,
@@ -516,11 +526,11 @@ class DeckBuilder:
             py = ty + th + Inches(0.35)
             pts = spec.points[:4]
             if len(pts) <= 2:
-                self._point_list(s, pts, MARGIN, py, W - 2 * MARGIN, bottom - py, max_pt=20)
+                self._point_list(s, pts, self.margin, py, self.W - 2 * self.margin, bottom - py, max_pt=20)
             else:
-                self._point_columns(s, pts, MARGIN, py, W - 2 * MARGIN, bottom - py, max_pt=20)
+                self._point_columns(s, pts, self.margin, py, self.W - 2 * self.margin, bottom - py, max_pt=20)
         if spec.source:
-            self._text(s, f"Source: {spec.source}", MARGIN, source_y, W - 2 * MARGIN,
+            self._text(s, f"Source: {spec.source}", self.margin, source_y, self.W - 2 * self.margin,
                        Inches(0.3), 10, self.muted, italic=True)
         self._footer(s, number)
         self._notes(s, spec.speaker_notes)
@@ -528,30 +538,30 @@ class DeckBuilder:
     def chart(self, spec: SlideSpec, number: int):
         c: ChartSpec = spec.chart
         s = self._new_slide()
-        top = self._header(s, spec, W - 2 * MARGIN)
-        source_y = CONTENT_BOTTOM - Inches(0.3)
+        top = self._header(s, spec, self.W - 2 * self.margin)
+        source_y = self.content_bottom - Inches(0.3)
         bottom = source_y - Inches(0.1)
         insights = spec.points[:3]
-        chart_w = (W - 2 * MARGIN) * (0.6 if insights else 1.0)
+        chart_w = (self.W - 2 * self.margin) * (0.6 if insights else 1.0)
 
         data = CategoryChartData()
         data.categories = c.categories
         series_list = c.series[:1] if c.chart_type == "pie" else c.series
         for ser in series_list:
             data.add_series(ser.name, ser.values)
-        frame = s.shapes.add_chart(CHART_TYPES[c.chart_type], int(MARGIN), int(top),
+        frame = s.shapes.add_chart(CHART_TYPES[c.chart_type], int(self.margin), int(top),
                                    int(chart_w), int(bottom - top), data)
         self._style_chart(frame.chart, c, len(series_list))
 
         if insights:
-            px = MARGIN + chart_w + Inches(0.4)
-            pw = W - MARGIN - px
+            px = self.margin + chart_w + Inches(0.4)
+            pw = self.W - self.margin - px
             self._rect(s, px, top, pw, bottom - top, self.surface, rounded=True, radius=0.04)
             self._text(s, "KEY INSIGHTS", px + Inches(0.3), top + Inches(0.2), pw - Inches(0.6),
                        Inches(0.4), 13, self.accent, self.t.title_font, bold=True)
             self._point_list(s, insights, px + Inches(0.25), top + Inches(0.7), pw - Inches(0.5),
                              bottom - top - Inches(0.9), max_pt=19, min_pt=11)
-        self._text(s, f"Source: {c.source}", MARGIN, source_y, W - 2 * MARGIN, Inches(0.3),
+        self._text(s, f"Source: {c.source}", self.margin, source_y, self.W - 2 * self.margin, Inches(0.3),
                    10, self.muted, italic=True)
         self._footer(s, number)
         self._notes(s, spec.speaker_notes)

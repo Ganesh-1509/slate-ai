@@ -4,11 +4,12 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 
-from pptgen import PRESETS, ContentError, make_presentation
+from pptgen import PRESETS, ContentError, TemplateError, describe_template, make_presentation
 
 APP_NAME = "Slate.ai"
 MAX_SLIDES = 15
 CUSTOM = "Custom"
+TEMPLATE = "Your template"
 
 load_dotenv()  # local: read keys from .env
 # Streamlit Cloud: keys live in the app's "Secrets" settings
@@ -40,18 +41,35 @@ with st.container(border=True):
 
     preset = st.segmented_control(
         "Style",
-        [p.capitalize() for p in PRESETS] + [CUSTOM],
+        [p.capitalize() for p in PRESETS] + [CUSTOM, TEMPLATE],
         default="Minimal",
         required=True,
         key="style",
     )
     custom_theme = ""
+    template_bytes = None
     if preset == CUSTOM:
         custom_theme = st.text_input(
             "Describe your style",
             placeholder="e.g. dark navy with gold accents, elegant serif fonts",
             key="custom_style",
         )
+    elif preset == TEMPLATE:
+        upload = st.file_uploader(
+            "Upload a PowerPoint template or deck",
+            type=["pptx", "potx"],
+            key="template",
+            help="Its layouts, backgrounds, logos, fonts and colours are used for every slide. "
+                 "Any existing slides in the file are replaced.",
+        )
+        if upload is not None:
+            template_bytes = upload.getvalue()
+            try:
+                st.caption(f":material/check_circle: {upload.name}  ·  "
+                           f"{describe_template(template_bytes)}")
+            except TemplateError as e:
+                st.error(str(e), icon=":material/error:")
+                template_bytes = None
 
     left, right = st.columns(2, vertical_alignment="bottom")
     with left:
@@ -72,18 +90,27 @@ with st.container(border=True):
 
 # ---------------------------------------------------------------- generation
 if generate:
-    theme = custom_theme.strip() if preset == CUSTOM else (preset or "minimal").lower()
+    if preset == CUSTOM:
+        theme = custom_theme.strip()
+    elif preset == TEMPLATE:
+        theme = "match the uploaded template"
+    else:
+        theme = (preset or "minimal").lower()
     if len(topic.strip()) < 5:
         st.error("Describe your topic first.", icon=":material/edit_note:")
     elif not theme:
         st.error("Describe your custom style, or pick one of the presets.",
                  icon=":material/palette:")
+    elif preset == TEMPLATE and template_bytes is None:
+        st.error("Upload a .pptx or .potx template first, or pick another style.",
+                 icon=":material/upload_file:")
     else:
         with st.status("Creating your deck...", expanded=True) as status:
             try:
                 file_name, data = make_presentation(
                     topic.strip(), theme, num_slides, audience.strip() or "general audience",
                     api_key=user_key.strip() or None, log=st.caption,
+                    template=template_bytes,
                 )
                 st.session_state["result"] = (file_name, data)
                 status.update(label="Your deck is ready", state="complete", expanded=False)

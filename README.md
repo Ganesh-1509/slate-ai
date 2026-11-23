@@ -41,6 +41,11 @@ Create an empty repo on github.com, then run the two `git remote add` / `git pus
    ```
 4. Click **Deploy**. You get a public link like `https://your-app.streamlit.app`.
 
+## Use your own template
+Pick **Your template** under Style and upload a `.pptx` or `.potx` file (max 25 MB).
+Its layouts, backgrounds, logos, fonts and colours are used for every slide; any
+slides already in the file are replaced. Command line: `python cli.py "Topic" --template my.pptx`
+
 ## Good to know
 - Free Gemini quota is shared by everyone using your site. When it runs out, users see
   a message and can paste their own free key (it is not stored).

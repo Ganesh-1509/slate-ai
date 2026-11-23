@@ -27,3 +27,7 @@ redColor = "#EF4444"
 [client]
 # Hide developer tools (Deploy button etc.) from visitors
 toolbarMode = "minimal"
+
+[server]
+# Templates are usually a few MB; keep uploads small on the free host
+maxUploadSize = 25

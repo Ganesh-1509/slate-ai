@@ -3,6 +3,7 @@
 Example:
     python cli.py "Electric vehicles in India" --theme dark --slides 8
     python cli.py "History of the Internet" --theme "retro, warm browns, serif fonts"
+    python cli.py "Quarterly results" --template my-company-template.pptx
 """
 import argparse
 import sys
@@ -22,10 +23,13 @@ def main():
     ap.add_argument("--slides", type=int, default=8, help="Number of content slides")
     ap.add_argument("--audience", default="general audience")
     ap.add_argument("--out", default="output", help="Output folder")
+    ap.add_argument("--template", help="Optional .pptx/.potx template to build the slides on")
     args = ap.parse_args()
 
     try:
-        name, data = make_presentation(args.topic, args.theme, args.slides, args.audience)
+        template = Path(args.template).read_bytes() if args.template else None
+        name, data = make_presentation(args.topic, args.theme, args.slides, args.audience,
+                                       template=template)
     except ContentError as e:
         sys.exit(f"Error: {e}")
 
