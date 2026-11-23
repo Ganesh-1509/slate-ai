@@ -1,0 +1,29 @@
+# Slate - dark, minimal theme (locked to dark mode)
+[theme]
+base = "dark"
+primaryColor = "#6366F1"
+backgroundColor = "#0B0B0E"
+secondaryBackgroundColor = "#16161B"
+textColor = "#EDEDF0"
+linkColor = "#A5B4FC"
+borderColor = "#26262D"
+showWidgetBorder = true
+baseRadius = "10px"
+buttonRadius = "10px"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+codeFont = "'JetBrains Mono':https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseFontSize = 15
+headingFontSizes = ["48px", "24px", "18px", "16px", "14px", "12px"]
+headingFontWeights = [800, 600, 600, 500, 500, 500]
+linkUnderline = false
+
+violetColor = "#8B5CF6"
+blueColor = "#6366F1"
+greenColor = "#22C55E"
+yellowColor = "#F59E0B"
+orangeColor = "#F97316"
+redColor = "#EF4444"
+
+[client]
+# Hide developer tools (Deploy button etc.) from visitors
+toolbarMode = "minimal"
